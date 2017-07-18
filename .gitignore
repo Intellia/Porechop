@@ -32,3 +32,7 @@ setuptools*.zip
 .idea/
 
 gh-md-toc
+
+libcpp_functions.*
+build
+cmake-*

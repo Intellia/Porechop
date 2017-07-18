@@ -17,8 +17,13 @@ not, see <http://www.gnu.org/licenses/>.
 import os
 import sys
 from ctypes import CDLL, cast, c_char_p, c_int, c_void_p
+import platform
 
-SO_FILE = 'cpp_functions.so'
+if platform.system() == 'Darwin':
+    SO_FILE = 'libcpp_functions.dylib'
+else:
+    SO_FILE = 'libcpp_functions.so'
+
 SO_FILE_FULL = os.path.join(os.path.dirname(os.path.realpath(__file__)), SO_FILE)
 if not os.path.isfile(SO_FILE_FULL):
     sys.exit('could not find ' + SO_FILE + ' - please reinstall')
@@ -26,12 +31,11 @@ C_LIB = CDLL(SO_FILE_FULL)
 
 C_LIB.adapterAlignment.argtypes = [c_char_p,  # Read sequence
                                    c_char_p,  # Adapter sequence
-                                   c_int,     # Match score
-                                   c_int,     # Mismatch score
-                                   c_int,     # Gap open score
-                                   c_int]     # Gap extension score
-C_LIB.adapterAlignment.restype = c_void_p     # String describing alignment
-
+                                   c_int,  # Match score
+                                   c_int,  # Mismatch score
+                                   c_int,  # Gap open score
+                                   c_int]  # Gap extension score
+C_LIB.adapterAlignment.restype = c_void_p  # String describing alignment
 
 # This function cleans up the heap memory for the C strings returned by the other C functions. It
 # must be called after them.
