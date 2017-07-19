@@ -33,7 +33,7 @@ struct ScoringMatrixData_<int, Dna5, NAsMatchMatrix>
                 X, M, X, X, M, /* C */
                 X, X, M, X, M, /* G */
                 X, X, X, M, M, /* T */
-                M, M, M, M, M  /* N */
+                X, X, X, X, M  /* N */
             };
         return _data;
     }
