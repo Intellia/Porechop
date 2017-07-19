@@ -7,9 +7,15 @@
 #include <algorithm>
 #include <utility>
 
+#define GLOBAL_ALIGNMENT 1
 
-char * adapterAlignment(char * readSeq, char * adapterSeq,
-                        int matchScore, int mismatchScore, int gapOpenScore, int gapExtensionScore) {
+char *adapterAlignment(char *readSeq
+                       , char *adapterSeq
+                       , int matchScore
+                       , int mismatchScore
+                       , int gapOpenScore
+                       , int gapExtensionScore
+                      ) {
     std::string output;
 
     Dna5String sequenceH = readSeq;
@@ -21,23 +27,27 @@ char * adapterAlignment(char * readSeq, char * adapterSeq,
     resize(rows(alignment), 2);
     assignSource(row(alignment, 0), sequenceH);
     assignSource(row(alignment, 1), sequenceV);
-    Score<int, Simple> scoringScheme(matchScore, mismatchScore, gapExtensionScore, gapOpenScore);
-
+    Score<int, ScoreMatrix<Dna5, NAsMatchMatrix> > scoringScheme(gapExtensionScore, gapOpenScore);
+    #ifdef GLOBAL_ALIGNMENT
     AlignConfig<true, true, true, true> alignConfig;
     int score = globalAlignment(alignment, scoringScheme, alignConfig);
+    #else
+
+    int score = localAlignment(alignment, scoringScheme, DynamicGaps());
+    #endif
 
     ScoredAlignment scoredAlignment(alignment, length(readSeq), length(adapterSeq), score);
     return cppStringToCString(scoredAlignment.getString());
 }
 
 
-void freeCString(char * p) {
+void freeCString(char *p) {
     free(p);
 }
 
 
-char * cppStringToCString(std::string cpp_string) {
-    char * c_string = (char*)malloc(sizeof(char) * (cpp_string.size() + 1));
+char *cppStringToCString(std::string cpp_string) {
+    char *c_string = (char *) malloc(sizeof(char) * (cpp_string.size() + 1));
     std::copy(cpp_string.begin(), cpp_string.end(), c_string);
     c_string[cpp_string.size()] = '\0';
     return c_string;

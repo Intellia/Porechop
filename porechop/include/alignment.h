@@ -9,6 +9,40 @@
 
 using namespace seqan;
 
+namespace seqan {
+
+struct NAsMatchMatrix {};
+
+#define M 2
+#define X -2
+
+template <>
+struct ScoringMatrixData_<int, Dna5, NAsMatchMatrix>
+{
+    enum
+    {
+        VALUE_SIZE = ValueSize<Dna5>::VALUE,
+        TAB_SIZE = VALUE_SIZE * VALUE_SIZE
+    };
+
+    static inline int const * getData()
+    {
+        static int const _data[TAB_SIZE] =
+            { /*A  C  G  T  N*/
+                M, X, X, X, M, /* A */
+                X, M, X, X, M, /* C */
+                X, X, M, X, M, /* G */
+                X, X, X, M, M, /* T */
+                X, X, X, X, M  /* N */
+            };
+        return _data;
+    }
+};
+
+#undef M
+#undef X
+
+}
 
 class ScoredAlignment {
 public:
@@ -25,6 +59,7 @@ public:
     int m_rawScore;
     double m_alignedRegionPercentIdentity;
     double m_fullAdapterPercentIdentity;
+    std::string m_umi;
 };
 
 #endif // ALIGNMENT_H

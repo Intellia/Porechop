@@ -19,12 +19,12 @@ from .misc import yellow, red, add_line_breaks_to_sequence, END_FORMATTING, RED,
 
 
 class NanoporeRead(object):
-
     def __init__(self, name, seq, quals):
         self.name = name
 
         self.seq = seq
         self.quals = quals
+
         if len(quals) < len(seq):
             self.quals += '+' * (len(seq) - len(quals))
 
@@ -39,12 +39,14 @@ class NanoporeRead(object):
 
         self.start_barcode_scores = {}
         self.end_barcode_scores = {}
+        self.barcode_umi = {}
 
         self.best_start_barcode = ('none', 0.0)
         self.best_end_barcode = ('none', 0.0)
         self.second_best_start_barcode = ('none', 0.0)
         self.second_best_end_barcode = ('none', 0.0)
         self.barcode_call = 'none'
+        self.umi_call = 'NA'
 
     def get_seq_with_start_end_adapters_trimmed(self):
         if not self.start_trim_amount and not self.end_trim_amount:
@@ -91,7 +93,13 @@ class NanoporeRead(object):
             seq = self.get_seq_with_start_end_adapters_trimmed()
             if not seq:  # Don't return empty sequences
                 return ''
-            return ''.join(['>', self.name, '\n', add_line_breaks_to_sequence(seq, 70)])
+            return ''.join(['>',
+                            self.umi_call,
+                            '_',
+                            self.name,
+                            '\n',
+                            add_line_breaks_to_sequence(seq, 70)
+                            ])
         elif discard_middle:
             return ''
         else:
@@ -109,8 +117,15 @@ class NanoporeRead(object):
             seq = self.get_seq_with_start_end_adapters_trimmed()
             if not seq:  # Don't return empty sequences
                 return ''
-            return ''.join(['@', self.name, '\n', seq, '\n+\n',
-                            self.get_quals_with_start_end_adapters_trimmed(), '\n'])
+            return ''.join(['@',
+                            self.umi_call,
+                            '_',
+                            self.name,
+                            '\n',
+                            seq,
+                            '\n+\n',
+                            self.get_quals_with_start_end_adapters_trimmed(),
+                            '\n'])
         elif discard_middle:
             return ''
         else:
@@ -130,13 +145,13 @@ class NanoporeRead(object):
         sets are present in the data.
         """
         read_seq_start = self.seq[:end_size]
-        score, _, _, _ = align_adapter(read_seq_start, adapter_set.start_sequence[1],
-                                       scoring_scheme_vals)
+        score, _, _, _, _ = align_adapter(read_seq_start, adapter_set.start_sequence[1],
+                                          scoring_scheme_vals)
         adapter_set.best_start_score = max(adapter_set.best_start_score, score)
         if adapter_set.end_sequence:
             read_seq_end = self.seq[-end_size:]
-            score, _, _, _ = align_adapter(read_seq_end, adapter_set.end_sequence[1],
-                                           scoring_scheme_vals)
+            score, _, _, _, _ = align_adapter(read_seq_end, adapter_set.end_sequence[1],
+                                              scoring_scheme_vals)
             adapter_set.best_end_score = max(adapter_set.best_end_score, score)
 
     def find_start_trim(self, adapters, end_size, extra_trim_size, end_threshold,
@@ -147,16 +162,18 @@ class NanoporeRead(object):
         """
         read_seq_start = self.seq[:end_size]
         for adapter in adapters:
-            full_score, partial_score, read_start, read_end = \
+            full_score, partial_score, read_start, read_end, umi = \
                 align_adapter(read_seq_start, adapter.start_sequence[1], scoring_scheme_vals)
             if partial_score > end_threshold and read_end != end_size and \
-                    read_end - read_start >= min_trim_size:
+                                    read_end - read_start >= min_trim_size:
                 trim_amount = read_end + extra_trim_size
                 self.start_trim_amount = max(self.start_trim_amount, trim_amount)
                 self.start_adapter_alignments.append((adapter, full_score, partial_score,
                                                       read_start, read_end))
+
             if check_barcodes and adapter.is_barcode():
                 self.start_barcode_scores[adapter.get_barcode_name()] = full_score
+                self.barcode_umi[adapter.get_barcode_name()] = umi
 
     def find_end_trim(self, adapters, end_size, extra_trim_size, end_threshold,
                       scoring_scheme_vals, min_trim_size, check_barcodes):
@@ -168,10 +185,10 @@ class NanoporeRead(object):
         for adapter in adapters:
             if not adapter.end_sequence:
                 continue
-            full_score, partial_score, read_start, read_end = \
+            full_score, partial_score, read_start, read_end, _ = \
                 align_adapter(read_seq_end, adapter.end_sequence[1], scoring_scheme_vals)
             if partial_score > end_threshold and read_start != 0 and \
-                    read_end - read_start >= min_trim_size:
+                                    read_end - read_start >= min_trim_size:
                 trim_amount = (end_size - read_start) + extra_trim_size
                 self.end_trim_amount = max(self.end_trim_amount, trim_amount)
                 self.end_adapter_alignments.append((adapter, full_score, partial_score,
@@ -191,11 +208,11 @@ class NanoporeRead(object):
             # We keep aligning adapters as long we get strong hits, so we can find multiple
             # occurrences in a single read.
             while True:
-                full_score, _, read_start, read_end = align_adapter(masked_seq, adapter_seq,
-                                                                    scoring_scheme_vals)
+                full_score, _, read_start, read_end, _ = align_adapter(masked_seq, adapter_seq,
+                                                                       scoring_scheme_vals)
                 if full_score >= middle_threshold:
                     masked_seq = masked_seq[:read_start] + '-' * (read_end - read_start) + \
-                        masked_seq[read_end:]
+                                 masked_seq[read_end:]
                     self.middle_adapter_positions.update(range(read_start, read_end))
 
                     self.middle_hit_str += '  ' + adapter_name + ' (read coords: ' + \
@@ -225,8 +242,8 @@ class NanoporeRead(object):
         formatted_str = ''
         if red_bases:
             formatted_str = red(start_seq[:red_bases])
-        formatted_str += yellow(start_seq[red_bases:red_bases+extra_trim_size])
-        formatted_str += start_seq[red_bases+extra_trim_size:]
+        formatted_str += yellow(start_seq[red_bases:red_bases + extra_trim_size])
+        formatted_str += start_seq[red_bases + extra_trim_size:]
         return formatted_str
 
     def formatted_end_seq(self, end_size, extra_trim_size):
@@ -240,8 +257,8 @@ class NanoporeRead(object):
         formatted_str = ''
         if red_bases:
             formatted_str = red(end_seq[-red_bases:])
-        formatted_str = yellow(end_seq[-(red_bases+extra_trim_size):-red_bases]) + formatted_str
-        formatted_str = end_seq[:-(red_bases+extra_trim_size)] + formatted_str
+        formatted_str = yellow(end_seq[-(red_bases + extra_trim_size):-red_bases]) + formatted_str
+        formatted_str = end_seq[:-(red_bases + extra_trim_size)] + formatted_str
         return formatted_str
 
     def formatted_whole_seq(self, extra_trim_size):
@@ -264,7 +281,7 @@ class NanoporeRead(object):
             formatted_start = red(self.seq[:red_start_bases])
         if self.end_trim_amount:
             formatted_end = red(self.seq[-red_end_bases:])
-        middle = self.seq[red_start_bases:len(self.seq)-red_end_bases]
+        middle = self.seq[red_start_bases:len(self.seq) - red_end_bases]
 
         if len(middle) <= extra_trim_size * 2:
             middle = yellow(middle)
@@ -294,6 +311,7 @@ class NanoporeRead(object):
         def get_alignment_string(aln):
             return aln[0].name + ', full score=' + str(aln[1]) + ', partial score=' + \
                    str(aln[2]) + ', read position: ' + str(aln[3]) + '-' + str(aln[4])
+
         output = self.name + '\n'
         output += '  start: ' + self.formatted_start_seq(end_size, extra_trim_size) + '...\n'
         if self.start_adapter_alignments:
@@ -318,6 +336,7 @@ class NanoporeRead(object):
             output += '    best start barcode: ' + start_name + ' (' + '%.1f' % start_id + '%)\n'
             output += '    best end barcode:   ' + end_name + ' (' + '%.1f' % end_id + '%)\n'
             output += '    barcode call:       ' + self.barcode_call + '\n'
+            output += '    UMI call:           ' + self.umi_call + '\n'
         output += '\n'
         return output
 
@@ -433,6 +452,8 @@ class NanoporeRead(object):
                 assert good_diff
 
                 self.barcode_call = best_overall_barcode[0]
+                if self.barcode_call in self.barcode_umi:
+                    self.umi_call = self.barcode_umi[self.barcode_call]
 
         except AssertionError:
             self.barcode_call = 'none'
@@ -448,12 +469,14 @@ def align_adapter(read_seq, adapter_seq, scoring_scheme_vals):
         read_end = 0
         aligned_region_percent_identity = 0.0
         full_adapter_percent_identity = 0.0
+        umi = ""
     else:
         read_end = int(result_parts[1]) + 1
         aligned_region_percent_identity = float(result_parts[5])
         full_adapter_percent_identity = float(result_parts[6])
+        umi = result_parts[7]
 
-    return full_adapter_percent_identity, aligned_region_percent_identity, read_start, read_end
+    return full_adapter_percent_identity, aligned_region_percent_identity, read_start, read_end, umi
 
 
 def add_number_to_read_name(read_name, number):

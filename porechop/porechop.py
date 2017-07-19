@@ -226,6 +226,7 @@ def find_matching_adapter_sets(reads, verbosity, end_size, scoring_scheme_vals, 
         def align_adapter_set_one_arg(all_args):
             r, a, b, c = all_args
             r.align_adapter_set(a, b, c)
+
         with ThreadPool(threads) as pool:
             arg_list = []
             for read in read_subset:
@@ -357,6 +358,7 @@ def find_adapters_at_read_ends(reads, matching_sets, verbosity, end_size, extra_
                 return r.full_start_end_output(b, c, g)
             else:
                 return ''
+
         with ThreadPool(threads) as pool:
             arg_list = []
             for read in reads:
@@ -399,7 +401,7 @@ def find_adapters_in_read_middles(reads, matching_sets, verbosity, middle_thresh
     for matching_set in matching_sets:
         adapters.append(matching_set.start_sequence)
         if matching_set.end_sequence and \
-                matching_set.end_sequence[1] != matching_set.start_sequence[1]:
+                        matching_set.end_sequence[1] != matching_set.start_sequence[1]:
             adapters.append(matching_set.end_sequence)
 
     start_sequence_names = set()
@@ -425,6 +427,7 @@ def find_adapters_in_read_middles(reads, matching_sets, verbosity, middle_thresh
             r, a, b, c, d, e, f, g, v = all_args
             r.find_middle_adapters(a, b, c, d, e, f, g)
             return r.middle_adapter_results(v)
+
         with ThreadPool(threads) as pool:
             arg_list = []
             for read in reads:
@@ -474,7 +477,7 @@ def output_reads(reads, out_format, output, read_type, verbosity, discard_middle
         if not os.path.isdir(barcode_dir):
             os.makedirs(barcode_dir)
         barcode_files = {}
-        barcode_read_counts, barcode_base_counts = defaultdict(int), defaultdict(int)
+        barcode_read_counts, barcode_base_counts, umi_counts = defaultdict(int), defaultdict(int), defaultdict(int)
         for read in reads:
             barcode_name = read.barcode_call
             read_str = read.get_fasta(min_split_size, discard_middle) if out_format == 'fasta' \
@@ -487,7 +490,14 @@ def output_reads(reads, out_format, output, read_type, verbosity, discard_middle
             barcode_files[barcode_name].write(read_str)
             barcode_read_counts[barcode_name] += 1
             barcode_base_counts[barcode_name] += read.seq_length_with_start_end_adapters_trimmed()
+            umi_counts[read.umi_call] += 1
+
         table = [['Barcode', 'Reads', 'Bases', 'File']]
+
+        # report UMI
+        # TODO: write into a dedicated file
+        for b, c in umi_counts.items():
+            print("{}\t{}".format(b, c), file=sys.stderr)
 
         for barcode_name in sorted(barcode_files.keys()):
             barcode_files[barcode_name].close()
