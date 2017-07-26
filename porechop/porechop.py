@@ -654,7 +654,7 @@ def output_reads(reads, out_format, output, read_type, verbosity, discard_middle
                          int_to_str(barcode_base_counts[barcode_name]), bin_filename]
             table.append(table_row)
 
-        if verbosity  0:
+        if verbosity > 0:
             print('')
             print_table(table, print_dest, alignments='LRRL', max_col_width=60, col_separation=2)
 
