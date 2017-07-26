@@ -36,3 +36,4 @@ gh-md-toc
 libcpp_functions.*
 build
 cmake-*
+.vscode

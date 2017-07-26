@@ -95,7 +95,7 @@ class NanoporeRead(object):
                 return ''
             return ''.join(['>',
                             self.umi_call,
-                            '_',
+                            '_' if self.umi_call else '',
                             self.name,
                             '\n',
                             add_line_breaks_to_sequence(seq, 70)
@@ -119,7 +119,7 @@ class NanoporeRead(object):
                 return ''
             return ''.join(['@',
                             self.umi_call,
-                            '_',
+                            '_' if self.umi_call else '',
                             self.name,
                             '\n',
                             seq,
