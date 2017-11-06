@@ -7,6 +7,20 @@
 * Output potential UMI, the nucleotides in reads that align with 'N's (in fasta/q header and stderr)
 * Add CMake to compile the C++ code to `so` or `dylib`, call it with `nanopore_read.py`
 
+## Install the `so` or `dylib`
+```bash
+cd porechop && mkdir build && cd build && cmake .. && make && make install
+```
+
+## Usage
+```bash
+# edit porechop/adaptors.py to include your adaptors
+python3 porechop-runner.py \
+  -i 20171006_2119_B2Mtloc_HepADintgrt/ \
+  -o 20171006_2119-reads.fq
+```
+
+
 <hr>
 
 <p align="center"><img src="misc/porechop_logo_knife.png" alt="Porechop" width="600"></p>
